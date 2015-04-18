@@ -21,7 +21,6 @@ def mainfunc(np.ndarray[double, ndim=2, mode="c"] SigmaInput not None,
     cdef np.ndarray mu_input = np.zeros((m1,nlambda), dtype = np.float64, order='C')
     cdef np.ndarray iicov = np.zeros((m1*m1,nlambda), dtype = np.float64, order='C')
 
-    print ("There is an error")
     #Call external C function
     parametric(<double*> np.PyArray_DATA(SigmaInput),
                &m1,
