@@ -24,7 +24,8 @@ def is_Hermitian(m):
     
 def symmetrize(m,rule="min"):
     """
-    Symmetrizes a given square matrix based on a rule
+    Symmetrizes a given square matrix with 
+    respect to main diagonal, based on a rule
 
     Parameters:
     -----------------------------------------
@@ -42,7 +43,7 @@ def symmetrize(m,rule="min"):
     import numpy as np
     
     if (m.shape[0] != m.shape[1]):
-        raise ValueError("Input matrix must be square.")
+        raise TypeError("Input matrix must be square.")
         
     if (rule == "min"):
         min_mat =  np.fmin(np.triu(m),np.tril(m).T)
@@ -62,9 +63,9 @@ def loglik(Sigma,Omega):
 
     Parameters:
     -----------------------------------------
-    Sigma:  empirical covariance matrix
+    Sigma:  covariance matrix
 
-    Omega:  precision matrix (estimate or ground truth)
+    Omega:  precision matrix 
 
     Returns:
     -----------------------------------------
@@ -86,17 +87,18 @@ def loglik(Sigma,Omega):
     
 def fastclime_lambda(lambdamtx,icovlist,lambda_val):
     """
-    Selects the precision matrix and solution path for a 
-    given parameter lambda
+    Selects the precision matrix for a given lambda
 
     Parameters:
     ------------------------------------------------------
-    lambdamtx : A nlambda x d array containing the regularization path 
-                of tuning parameters for each column of the estimated 
-                precision matrix
+    lambdamtx : The sequence of regularization parameters for each column, 
+                it is a nlambda by d matrix. It will be filled with 0 when 
+                the program finds the required lambda.min value for that 
+                column. 
     
-    icovlist  : A 3-D array with nlambda d x d precision matrices
-               estimated from fastclime
+    icovlist  : A nlambda list of d by d precision matrices as an 
+                alternative graph path (numerical path) corresponding 
+                to lambdamtx. 
                
     lambda_val : user-selected regularization tuning parameter
 
@@ -131,10 +133,15 @@ def fastclime_lambda(lambdamtx,icovlist,lambda_val):
     del temp_lambda, seq, d#, threshold
     
     return icov
+
+class ReturnSelect(object):
+    def __init__(self,opt_lambda, opt_icov):
+        self.opt_lambda = opt_lambda
+        self.opt_icov = opt_icov
     
     
 def fastclime_select(x,lambdamtx,icovlist,metric="stars",rep_num=20,
-                    stars_thresh=0.1,stars_subsample_ratio=None):
+                    stars_thresh=0.05,stars_subsample_ratio=None):
     """
     Computes optimal regularization tuning parameter, 
     lambda using AIC or BIC metric or using stability approach
@@ -144,12 +151,15 @@ def fastclime_select(x,lambdamtx,icovlist,metric="stars",rep_num=20,
     ------------------------------------------------------ 
     x         : data matrix
     
-    lambdamtx : A nlambda x d array containing the regularization path 
-                of tuning parameters for each column of the estimated 
-                precision matrix
+    lambdamtx : The sequence of regularization parameters for each column, 
+                it is a nlambda by d matrix. It will be filled with 0 when 
+                the program finds the required lambda.min value for that 
+                column. This parameter is required for fastclime_lambda.
     
-    icovlist  : A 3-D array with nlambda d x d precision matrices
-               estimated from fastclime
+    icovlist  : A nlambda list of d by d precision matrices as an 
+                alternative graph path (numerical path) corresponding 
+                to lambdamtx. This parameter is also required for
+                fastclime_lambda.
                
     metric    : selection criterion. AIC, BIC and stars are available.
                 When n < d, the degrees of freedom for AIC and BIC are 
@@ -172,7 +182,7 @@ def fastclime_select(x,lambdamtx,icovlist,metric="stars",rep_num=20,
     optimal lambda parameter and corresponding precision
     matrix
     
-    References: 1) H. Pang, et al. (2013) The fastclime Package for Linear 
+    References: 1) H. Pang, et al. (2014) The fastclime Package for Linear 
                 Programming and Large-Scale Precision Matrix Estimation in R
     
                 2) H. Liu, et al. (2010) Stability Approach to Regularization
@@ -193,7 +203,7 @@ def fastclime_select(x,lambdamtx,icovlist,metric="stars",rep_num=20,
 
         for i in range(nl):
             if (d>n):
-                m = np.sum(np.absolute(icovlist[:,:,1])>1e-5,dtype=int)
+                m = np.sum(np.absolute(icovlist[:,:,1])>1.0e-5,dtype=int)
                 df = d + m*(m-1.0)/2.0
             else: 
                 df = d
@@ -230,7 +240,7 @@ def fastclime_select(x,lambdamtx,icovlist,metric="stars",rep_num=20,
             rows = np.floor(float(n)*stars_subsample_ratio)
             rand_sample = np.random.permutation(x)[:rows,:]
 
-            tmp = fastclime_main(rand_sample)[5]
+            tmp = fastclime_R(rand_sample).icovlist
 
             for i in range(nl):
                 merge[:,:,i]+=tmp[:,:,i]
@@ -246,12 +256,20 @@ def fastclime_select(x,lambdamtx,icovlist,metric="stars",rep_num=20,
         opt_index = max(np.where(variability[variability>=float(stars_thresh)] == max(variability))[0]-1,1)
         opt_lambda = np.max(lambdamtx[opt_index,:])
         
-    opt_icov = fastclime_lambda(lambdamtx,icovlist,opt_lambda)
-        
-    return opt_lambda, opt_icov
+    opt_icov = symmetrize(fastclime_lambda(lambdamtx,icovlist,opt_lambda),rule="min")
+    
+    return ReturnSelect(opt_lambda, opt_icov)
 
-        
-def fastclime_main(x,lambda_min=0.1,nlambda=50):
+class fastclime_obj(object):
+    def __init__(self, x, cov_input, Sigmahat, maxnlambda, lambdamtx, icovlist):
+        self.x = x
+        self.cov_input = cov_input
+        self.Sigmahat = Sigmahat  
+        self.maxnlambda = maxnlambda
+        self.lambdamtx = lambdamtx
+        self.icovlist = icovlist
+    
+def fastclime_R(x,lambda_min=0.1,nlambda=50):
     """
     Main function for CLIME estimation of the precision
     matrix
@@ -261,19 +279,23 @@ def fastclime_main(x,lambda_min=0.1,nlambda=50):
     x          :  There are 2 options: (1) x is an n by d data matrix 
                   (2) a d by d sample covariance matrix. The program 
                   automatically identifies the input matrix by checking the
-                  symmetry.
+                  symmetry. The program automatically normalizes the data
+                  to mean 0 and standard deviation 1 along each column.
 
-    lambda_min :  precision matrix (estimate or ground truth)
+    lambda_min :  This is the smallest value of lambda you would 
+                  like the solver to explorer
     
-    nlambda    :  maximum path length
+    nlambda    :  maximum path length. Note if d is large and nlambda 
+                  is also large, it is possible that the program
+                  will fail to allocate memory for the path.
 
     Returns:
     ---------------------------------------------------
-    x         :
+    x         : Input matrix
     
     cov_input : Indicator for sample covariance
     
-    Sigmahat  : empirical covariance matrix
+    Sigmahat  : normalized empirical covariance matrix
     
     maxnlambda: The length of the path. If the program finds 
                 lambda.min in less than nlambda iterations for 
@@ -281,30 +303,33 @@ def fastclime_main(x,lambda_min=0.1,nlambda=50):
                 all columns will be returned. Otherwise it equals 
                 nlambda.
     
-    lambdamtx : A nlambda x d array containing the regularization path 
-                of tuning parameters for each column of the estimated 
-                precision matrix
+    lambdamtx : The sequence of regularization parameters for each column, 
+                it is a nlambda by d matrix. It will be filled with 0 when 
+                the program finds the required lambda.min value for that 
+                column. This parameter is required for fastclime_lambda.
     
-    icovlist  : A 3-D array with nlambda d x d precision matrices
-               estimated from fastclime
+    icovlist  : A nlambda list of d by d precision matrices as an 
+                alternative graph path (numerical path) corresponding 
+                to lambdamtx. This parameter is also required for
+                fastclime_lambda.
     
     References: 1) T. Cai, et al. (2011) A constrained l1 minimization 
                 approach to sparse precision matrix estimation.
      
-                2) H. Pang, et al. (2013) The fastclime Package for Linear 
+                2) H. Pang, et al. (2014) The fastclime Package for Linear 
                 Programming and Large-Scale Precision Matrix Estimation in R
     """
     import numpy as np
     import parametric as param
     
     if (isinstance(x,np.ndarray)==False):
-        raise ValueError("Input must be ndarray.")
+        raise TypeError("Input must be ndarray.")
         
     cov_input = 1
     SigmaInput = x.copy()
     
     #Check if matrix is symmetric
-    #If not, create scaled covariance matrix
+    #If not, create normalized covariance matrix = correlation matrix
     if not is_Hermitian(SigmaInput):
         SigmaInput = np.corrcoef(SigmaInput.T)
         cov_input = 0
@@ -324,10 +349,64 @@ def fastclime_main(x,lambda_min=0.1,nlambda=50):
     d = Sigmahat.shape[1]
     icovlist = np.empty((d, d, maxnlambda)) 
    
-    #Symmetrize output precision matrices 
     for i in range(maxnlambda):
-        #icovlist[:,:,i] = symmetrize(iicov[:,i].reshape((d,d)).T,"min")
         icovlist[:,:,i] = iicov[:,i].reshape((d,d)).T
     
-    return x, cov_input, Sigmahat, maxnlambda, lambdamtx, icovlist
+    return fastclime_obj(x, cov_input, Sigmahat, maxnlambda, lambdamtx, icovlist)
+
+def fastclime_est_select(x,lambda_min=0.1,nlambda=50,metric="stars",rep_num=20,
+                    stars_thresh=0.05,stars_subsample_ratio=None):
+    """
+    Performs CLIME estimation and automatically selects the 
+    optimal regularization parameter based on a given metric
+    (default = stars)
+
+    Parameters:
+    ------------------------------------------------------ 
+    x         : data matrix
+    
+    lambda_min :  This is the smallest value of lambda you would 
+                  like the solver to explorer
+    
+    nlambda    :  maximum path length. Note if d is large and nlambda 
+                  is also large, it is possible that the program
+                  will fail to allocate memory for the path.
+               
+    metric    : selection criterion. AIC, BIC and stars are available.
+                When n < d, the degrees of freedom for AIC and BIC are 
+                adjusted based on the number of non-zero elements in 
+                the estimate precision matrix.
+    
+    rep_num   : The number of subsamplings. The default value is 20. 
+                Only applicable when metric = "stars".
+    
+    stars_thresh : The variability threshold in stars. The default 
+                   value is 0.1. Only applicable when metric = "stars".
+    
+    stars_subsample_ratio : The subsampling ratio. The default 
+                            value is 10*sqrt(n)/n when n>144 and 0.8 
+                            when n<=144, where n is the sample size. 
+                            Only applicable when metric = "stars"
+
+    Returns   : 
+    ------------------------------------------------------
+    optimal lambda parameter and corresponding precision
+    matrix
+    
+    References: 1) H. Pang, et al. (2014) The fastclime Package for Linear 
+                Programming and Large-Scale Precision Matrix Estimation in R
+    
+                2) H. Liu, et al. (2010) Stability Approach to Regularization
+                Selection (StARS) for High Dimensional Graphical Models
+    
+    """
+
+    #Get CLIME estimates of the regularization path
+    fcres = fastclime_R(x,lambda_min,nlambda)
+    
+    #Get icov corresponding to best selected regularization parameter
+    fcres_select = fastclime_select(x,fcres.lambdamtx,fcres.icovlist,metric,rep_num,
+                    stars_thresh,stars_subsample_ratio)
+    
+    return ReturnSelect(fcres_select.opt_lambda,fcres_select.opt_icov)
     
