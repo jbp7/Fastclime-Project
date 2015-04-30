@@ -1,0 +1,17 @@
+\BOOKMARK [1][-]{section.1}{Introduction}{}% 1
+\BOOKMARK [1][-]{section.2}{CLIME method}{}% 2
+\BOOKMARK [2][-]{subsection.2.1}{Parametric Simplex Method}{section.2}% 3
+\BOOKMARK [2][-]{subsection.2.2}{CLIME Pseudocode}{section.2}% 4
+\BOOKMARK [2][-]{subsection.2.3}{Python Implementation}{section.2}% 5
+\BOOKMARK [1][-]{section.3}{Numerical Results}{}% 6
+\BOOKMARK [2][-]{subsection.3.1}{Unit Tests}{section.3}% 7
+\BOOKMARK [2][-]{subsection.3.2}{Profiling}{section.3}% 8
+\BOOKMARK [2][-]{subsection.3.3}{Numerical Simulations}{section.3}% 9
+\BOOKMARK [3][-]{subsubsection.3.3.1}{Benchmarking Python and R}{subsection.3.3}% 10
+\BOOKMARK [3][-]{subsubsection.3.3.2}{Comparison with existing algorithms for precision matrix estimation}{subsection.3.3}% 11
+\BOOKMARK [1][-]{section.4}{Future Work}{}% 12
+\BOOKMARK [2][-]{subsection.4.1}{CAPME problem}{section.4}% 13
+\BOOKMARK [2][-]{subsection.4.2}{Additional Functionality}{section.4}% 14
+\BOOKMARK [3][-]{subsubsection.4.2.1}{Regularization parameter selection in fastclime and CAPME}{subsection.4.2}% 15
+\BOOKMARK [3][-]{subsubsection.4.2.2}{GPU processing}{subsection.4.2}% 16
+\BOOKMARK [1][-]{section.5}{References}{}% 17
