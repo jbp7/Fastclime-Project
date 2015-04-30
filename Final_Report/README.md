@@ -1,8 +1,8 @@
 # Final Project
 
-John Pura
+Author: John Pura
 
-<john.pura@duke.edu>
+Email <john.pura@duke.edu>
 
 ##Main Files:
 
