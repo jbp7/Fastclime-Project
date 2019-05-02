@@ -1,5 +1,6 @@
-#Final Project 
-#STA663 - Spring 2015
+# Final Project 
+
+## STA663 - Spring 2015
 
 Author: John Pura
 
