@@ -1,4 +1,4 @@
-# Final Project 
+# Fastclime Python Implementation 
 
 ## STA663 - Spring 2015
 
